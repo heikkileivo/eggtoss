@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>EggToss 🥚</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    overflow: hidden; user-select: none; color: #fff;
+    touch-action: manipulation;
+  }
+
+  .screen { display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; width: 100%; max-width: 400px; }
+  .screen.active { display: flex; }
+
+  /* START SCREEN */
+  .title { font-size: 3.5em; font-weight: 900; text-shadow: 3px 3px 0 rgba(0,0,0,0.2); margin-bottom: 5px; }
+  .subtitle { font-size: 1.2em; opacity: 0.9; margin-bottom: 30px; font-style: italic; }
+
+  .egg-display {
+    font-size: 120px; line-height: 1;
+    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
+    transition: transform 0.3s ease;
+  }
+  .egg-display.wobble { animation: wobble 0.5s ease-in-out infinite; }
+  .egg-display.flying { animation: fly 0.8s ease-out infinite alternate; }
+  .egg-display.splat { animation: splat 0.3s ease-out forwards; }
+
+  @keyframes wobble {
+    0%, 100% { transform: rotate(-3deg); }
+    50% { transform: rotate(3deg); }
+  }
+  @keyframes fly {
+    0% { transform: translateY(0) scale(1); }
+    100% { transform: translateY(-30px) scale(1.05); }
+  }
+  @keyframes splat {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.3, 0.6); }
+    100% { transform: scale(1.5, 0.4); opacity: 0.8; }
+  }
+
+  .btn {
+    background: #ff6b6b; color: #fff; border: none; padding: 18px 45px;
+    border-radius: 50px; font-size: 1.3em; font-weight: 800;
+    cursor: pointer; margin-top: 25px;
+    box-shadow: 0 6px 20px rgba(255,107,107,0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+    text-transform: uppercase; letter-spacing: 2px;
+  }
+  .btn:active { transform: scale(0.95); box-shadow: 0 3px 10px rgba(255,107,107,0.3); }
+  .btn.secondary { background: rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+
+  .disclaimer {
+    background: rgba(255,255,255,0.12); border-radius: 16px;
+    padding: 18px; margin-top: 25px; font-size: 0.8em;
+    line-height: 1.5; max-width: 340px; backdrop-filter: blur(5px);
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  .disclaimer strong { color: #ffdd57; }
+
+  /* READY SCREEN */
+  .ready-text { font-size: 1.8em; font-weight: 700; margin-top: 20px; }
+  .ready-sub { font-size: 1em; opacity: 0.8; margin-top: 10px; }
+  .pulse-ring {
+    width: 200px; height: 200px; border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.3);
+    display: flex; align-items: center; justify-content: center;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); border-color: rgba(255,255,255,0.2); }
+    50% { transform: scale(1.05); border-color: rgba(255,255,255,0.5); }
+  }
+
+  /* FLIGHT SCREEN */
+  .height-display { font-size: 5em; font-weight: 900; text-shadow: 3px 3px 0 rgba(0,0,0,0.2); }
+  .height-unit { font-size: 1.2em; opacity: 0.8; }
+  .flight-label { font-size: 1em; opacity: 0.7; margin-top: 10px; text-transform: uppercase; letter-spacing: 3px; }
+
+  /* RESULT SCREEN */
+  .result-title { font-size: 2.5em; font-weight: 900; margin: 15px 0 5px; }
+  .result-height { font-size: 3em; font-weight: 900; color: #ffdd57; }
+  .result-msg { font-size: 1.1em; opacity: 0.9; margin: 10px 0 5px; max-width: 300px; line-height: 1.4; }
+  .new-record { animation: celebrate 0.5s ease-in-out infinite alternate; color: #ffdd57; }
+  @keyframes celebrate { 0% { transform: scale(1); } 100% { transform: scale(1.05); } }
+
+  /* LEADERBOARD */
+  .lb-list {
+    list-style: none; width: 100%; max-width: 300px; margin-top: 15px;
+  }
+  .lb-list li {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 18px; margin: 6px 0; border-radius: 12px;
+    background: rgba(255,255,255,0.1); backdrop-filter: blur(5px);
+    font-size: 1.1em;
+  }
+  .lb-list li:first-child { background: rgba(255,221,87,0.25); }
+  .lb-rank { font-weight: 900; margin-right: 12px; min-width: 30px; }
+  .lb-height { font-weight: 700; color: #ffdd57; }
+  .lb-empty { opacity: 0.6; margin-top: 20px; }
+
+  /* CONFETTI */
+  .confetti-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+  .confetti-piece {
+    position: absolute; width: 10px; height: 10px;
+    top: -10px; animation: confettiFall linear forwards;
+  }
+  @keyframes confettiFall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+
+  /* YOLK SPLATTER */
+  .splatter-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; }
+  .yolk-splat {
+    position: absolute; border-radius: 50%;
+    animation: splatAnim 0.4s ease-out forwards;
+  }
+  @keyframes splatAnim {
+    0% { transform: scale(0); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.8; }
+  }
+
+  .buttons-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .no-motion { color: #ffdd57; font-size: 1.1em; margin-top: 20px; text-align: center; max-width: 320px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<!-- START SCREEN -->
+<div id="startScreen" class="screen active">
+  <div class="title">🥚 EggToss</div>
+  <div class="subtitle">Don't Drop It!</div>
+  <div class="egg-display wobble">🥚</div>
+  <button class="btn" onclick="goToReady()">TOSS TO PLAY</button>
+  <button class="btn secondary" style="padding:12px 30px; font-size:0.9em;" onclick="showLeaderboard()">🏆 Leaderboard</button>
+  <div class="disclaimer">
+    <strong>⚠️ WARNING:</strong> This game requires you to throw your phone into the air. The developers accept <strong>absolutely no responsibility</strong> for shattered screens, broken dreams, or disappointed parents. Play at your own risk. <em>Seriously.</em>
+  </div>
+</div>
+
+<!-- READY SCREEN -->
+<div id="readyScreen" class="screen">
+  <div class="pulse-ring">
+    <div class="egg-display wobble" style="font-size:90px;">🥚</div>
+  </div>
+  <div class="ready-text">Ready...</div>
+  <div class="ready-sub">Throw your phone UP! ☝️</div>
+  <div id="noMotionMsg" class="no-motion" style="display:none;">
+    📱 Motion sensors not available.<br>
+    <small>Try on a mobile device, or tap the button below to simulate a throw!</small>
+    <br><button class="btn" style="margin-top:15px; padding:12px 25px; font-size:0.9em;" onclick="simulateThrow()">🎲 Simulate Throw</button>
+  </div>
+  <button class="btn secondary" style="margin-top:30px; padding:10px 25px; font-size:0.85em;" onclick="goToStart()">← Back</button>
+</div>
+
+<!-- FLIGHT SCREEN -->
+<div id="flightScreen" class="screen">
+  <div class="egg-display flying" style="font-size:100px;">🥚</div>
+  <div class="height-display" id="liveHeight">0.0</div>
+  <div class="height-unit">meters</div>
+  <div class="flight-label">✈️ In Flight...</div>
+</div>
+
+<!-- RESULT SCREEN -->
+<div id="resultScreen" class="screen">
+  <div class="egg-display" id="resultEgg" style="font-size:100px;">🥚</div>
+  <div class="result-title" id="resultTitle">Nice Catch!</div>
+  <div class="result-height" id="resultHeight">0.0 m</div>
+  <div class="result-msg" id="resultMsg"></div>
+  <div id="recordBadge" class="new-record" style="display:none; font-size:1.3em; font-weight:800;">🎉 NEW RECORD! 🎉</div>
+  <div class="buttons-row">
+    <button class="btn" onclick="goToReady()">Try Again</button>
+    <button class="btn secondary" onclick="showLeaderboard()">🏆 Scores</button>
+  </div>
+</div>
+
+<!-- LEADERBOARD SCREEN -->
+<div id="lbScreen" class="screen">
+  <div class="title" style="font-size:2em;">🏆 High Scores</div>
+  <ul class="lb-list" id="lbList"></ul>
+  <div class="buttons-row" style="margin-top:20px;">
+    <button class="btn" onclick="goToReady()">Play</button>
+    <button class="btn secondary" onclick="goToStart()">← Menu</button>
+  </div>
+</div>
+
+<div class="confetti-container" id="confetti"></div>
+<div class="splatter-container" id="splatter"></div>
+
+<script>
+// --- State ---
+let scores = [];
+let state = 'idle'; // idle, ready, freefall, caught
+let motionAvail = false;
+let freefallStart = 0;
+let freefallDuration = 0;
+let lastAcc = 0;
+let catchImpact = 0;
+let motionCheckTimer = null;
+
+const G = 9.81;
+const FREEFALL_THRESH = 3;      // acceleration below this = freefall
+const CATCH_THRESH = 18;        // catch deceleration above this = egg breaks
+const MIN_FREEFALL_MS = 150;    // minimum freefall to count
+const HARSH_CATCH = 35;         // very harsh catch
+
+// --- Screens ---
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goToStart() {
+  state = 'idle';
+  showScreen('startScreen');
+}
+
+function goToReady() {
+  state = 'ready';
+  showScreen('readyScreen');
+  document.getElementById('noMotionMsg').style.display = 'none';
+  requestMotion();
+  motionCheckTimer = setTimeout(() => {
+    if (!motionAvail) {
+      document.getElementById('noMotionMsg').style.display = 'block';
+    }
+  }, 2000);
+}
+
+function requestMotion() {
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    DeviceMotionEvent.requestPermission().then(resp => {
+      if (resp === 'granted') startListening();
+    }).catch(() => {});
+  } else if ('DeviceMotionEvent' in window) {
+    startListening();
+  }
+}
+
+function startListening() {
+  window.addEventListener('devicemotion', handleMotion);
+}
+
+function handleMotion(e) {
+  motionAvail = true;
+  const a = e.accelerationIncludingGravity;
+  if (!a) return;
+  const totalAcc = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+
+  if (state === 'ready') {
+    // Detect freefall (near 0g)
+    if (totalAcc < FREEFALL_THRESH) {
+      state = 'freefall';
+      freefallStart = Date.now();
+      showScreen('flightScreen');
+      updateFlightHeight();
+    }
+  } else if (state === 'freefall') {
+    // Still in freefall?
+    if (totalAcc > FREEFALL_THRESH + 5) {
+      // Caught!
+      freefallDuration = Date.now() - freefallStart;
+      catchImpact = totalAcc;
+      if (freefallDuration > MIN_FREEFALL_MS) {
+        state = 'caught';
+        showResult();
+      } else {
+        // Too short, reset
+        state = 'ready';
+        showScreen('readyScreen');
+      }
+    }
+  }
+  lastAcc = totalAcc;
+}
+
+function updateFlightHeight() {
+  if (state !== 'freefall') return;
+  const elapsed = (Date.now() - freefallStart) / 1000;
+  const h = calcHeight(elapsed);
+  document.getElementById('liveHeight').textContent = h.toFixed(1);
+  requestAnimationFrame(updateFlightHeight);
+}
+
+function calcHeight(freefallSec) {
+  // Total freefall = up + down. Time to apex = half of freefall
+  // h = 0.5 * g * (t/2)^2
+  const tHalf = freefallSec / 2;
+  return 0.5 * G * tHalf * tHalf;
+}
+
+// --- Simulate for desktop ---
+function simulateThrow() {
+  state = 'freefall';
+  const simDuration = 400 + Math.random() * 800; // 0.4-1.2s freefall
+  freefallStart = Date.now();
+  showScreen('flightScreen');
+  updateFlightHeight();
+
+  setTimeout(() => {
+    freefallDuration = simDuration;
+    catchImpact = 10 + Math.random() * 30; // random catch harshness
+    state = 'caught';
+    showResult();
+  }, simDuration);
+}
+
+// --- Result ---
+function showResult() {
+  const freefallSec = freefallDuration / 1000;
+  const height = calcHeight(freefallSec);
+  const broken = catchImpact > CATCH_THRESH;
+
+  const eggEl = document.getElementById('resultEgg');
+  const titleEl = document.getElementById('resultTitle');
+  const heightEl = document.getElementById('resultHeight');
+  const msgEl = document.getElementById('resultMsg');
+  const recordEl = document.getElementById('recordBadge');
+
+  heightEl.textContent = height.toFixed(2) + ' m';
+  recordEl.style.display = 'none';
+
+  if (broken) {
+    eggEl.textContent = '🍳';
+    eggEl.className = 'egg-display splat';
+    titleEl.textContent = catchImpact > HARSH_CATCH ? '💥 OBLITERATED!' : '💔 Cracked!';
+    msgEl.textContent = catchImpact > HARSH_CATCH
+      ? 'That egg is now an omelette. Is your phone OK?'
+      : 'Too rough! Eggs are fragile, remember?';
+    showSplatter();
+  } else {
+    eggEl.textContent = '🥚';
+    eggEl.className = 'egg-display';
+    const isRecord = scores.length === 0 || height > Math.max(...scores);
+    if (isRecord && height > 0.1) {
+      titleEl.textContent = '🏆 INCREDIBLE!';
+      msgEl.textContent = 'New personal best! Your egg-catching skills are legendary.';
+      recordEl.style.display = 'block';
+      showConfetti();
+    } else if (height > 1) {
+      titleEl.textContent = '😎 Nice Toss!';
+      msgEl.textContent = 'The egg survived! Your phone is grateful.';
+    } else {
+      titleEl.textContent = '🤏 Baby Toss';
+      msgEl.textContent = "C'mon, throw it higher! Live dangerously!";
+    }
+    // Save score
+    scores.push(height);
+    scores.sort((a, b) => b - a);
+    if (scores.length > 10) scores.length = 10;
+  }
+
+  showScreen('resultScreen');
+}
+
+// --- Leaderboard ---
+function showLeaderboard() {
+  const list = document.getElementById('lbList');
+  list.innerHTML = '';
+  if (scores.length === 0) {
+    list.innerHTML = '<div class="lb-empty">No scores yet. Go throw your phone! 📱</div>';
+  } else {
+    const medals = ['🥇', '🥈', '🥉'];
+    scores.forEach((s, i) => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span><span class="lb-rank">${medals[i] || (i + 1)}</span>Throw ${i + 1}</span><span class="lb-height">${s.toFixed(2)} m</span>`;
+      list.appendChild(li);
+    });
+  }
+  showScreen('lbScreen');
+}
+
+// --- Effects ---
+function showConfetti() {
+  const c = document.getElementById('confetti');
+  c.innerHTML = '';
+  const colors = ['#ff6b6b', '#ffdd57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#01a3a4'];
+  for (let i = 0; i < 60; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = Math.random() * 100 + '%';
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+    piece.style.width = (6 + Math.random() * 10) + 'px';
+    piece.style.height = (6 + Math.random() * 10) + 'px';
+    piece.style.animationDuration = (1.5 + Math.random() * 2) + 's';
+    piece.style.animationDelay = Math.random() * 0.5 + 's';
+    c.appendChild(piece);
+  }
+  setTimeout(() => c.innerHTML = '', 4000);
+}
+
+function showSplatter() {
+  const s = document.getElementById('splatter');
+  s.innerHTML = '';
+  const yolkColors = ['#f0c040', '#e8a820', '#f5d060', '#d4941a'];
+  for (let i = 0; i < 12; i++) {
+    const splat = document.createElement('div');
+    splat.className = 'yolk-splat';
+    splat.style.left = (20 + Math.random() * 60) + '%';
+    splat.style.top = (20 + Math.random() * 60) + '%';
+    splat.style.width = (20 + Math.random() * 60) + 'px';
+    splat.style.height = (20 + Math.random() * 50) + 'px';
+    splat.style.background = yolkColors[Math.floor(Math.random() * yolkColors.length)];
+    splat.style.animationDelay = Math.random() * 0.2 + 's';
+    s.appendChild(splat);
+  }
+  setTimeout(() => s.innerHTML = '', 3000);
+}
+</script>
+</body>
+</html>
